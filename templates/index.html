@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Meter Monitor</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            min-height: 100vh;
+            color: #fff;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        header {
+            text-align: center;
+            padding: 30px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            margin-bottom: 30px;
+        }
+        
+        header h1 {
+            font-size: 2.5em;
+            background: linear-gradient(90deg, #00d4ff, #00ff88);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        header p {
+            color: #888;
+            margin-top: 10px;
+        }
+        
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .card {
+            background: rgba(255,255,255,0.05);
+            border-radius: 15px;
+            padding: 25px;
+            border: 1px solid rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+        
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(0,212,255,0.2);
+        }
+        
+        .card-title {
+            font-size: 0.9em;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 10px;
+        }
+        
+        .card-value {
+            font-size: 2.5em;
+            font-weight: bold;
+            color: #00d4ff;
+        }
+        
+        .card-unit {
+            font-size: 0.5em;
+            color: #888;
+            margin-left: 5px;
+        }
+        
+        .card-subtitle {
+            font-size: 0.85em;
+            color: #666;
+            margin-top: 5px;
+        }
+        
+        .chart-container {
+            background: rgba(255,255,255,0.05);
+            border-radius: 15px;
+            padding: 25px;
+            border: 1px solid rgba(255,255,255,0.1);
+            margin-bottom: 20px;
+        }
+        
+        .chart-title {
+            font-size: 1.2em;
+            margin-bottom: 20px;
+            color: #00d4ff;
+        }
+        
+        .chart-wrapper {
+            position: relative;
+            height: 300px;
+        }
+        
+        .status-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        
+        .status-online {
+            background: #00ff88;
+            box-shadow: 0 0 10px #00ff88;
+        }
+        
+        .status-offline {
+            background: #ff4444;
+            box-shadow: 0 0 10px #ff4444;
+        }
+        
+        .refresh-btn {
+            background: linear-gradient(90deg, #00d4ff, #00ff88);
+            border: none;
+            padding: 10px 20px;
+            border-radius: 25px;
+            color: #1a1a2e;
+            font-weight: bold;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        
+        .refresh-btn:hover {
+            transform: scale(1.05);
+        }
+        
+        .last-update {
+            text-align: center;
+            color: #666;
+            font-size: 0.85em;
+            margin-top: 20px;
+        }
+        
+        @media (max-width: 768px) {
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            header h1 {
+                font-size: 1.8em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>⚡ Smart Meter Monitor</h1>
+            <p>Monitoring Konsumsi Listrik Real-Time</p>
+        </header>
+        
+        <div class="dashboard-grid">
+            <div class="card">
+                <div class="card-title">Daya Saat Ini</div>
+                <div class="card-value">
+                    <span id="current-power">--</span>
+                    <span class="card-unit">Watt</span>
+                </div>
+                <div class="card-subtitle" id="power-status">Memuat...</div>
+            </div>
+            
+            <div class="card">
+                <div class="card-title">Tegangan</div>
+                <div class="card-value">
+                    <span id="current-voltage">--</span>
+                    <span class="card-unit">Volt</span>
+                </div>
+                <div class="card-subtitle">Tegangan listrik</div>
+            </div>
+            
+            <div class="card">
+                <div class="card-title">Arus</div>
+                <div class="card-value">
+                    <span id="current-ampere">--</span>
+                    <span class="card-unit">Ampere</span>
+                </div>
+                <div class="card-subtitle">Arus listrik</div>
+            </div>
+            
+            <div class="card">
+                <div class="card-title">Total KWH Hari Ini</div>
+                <div class="card-value">
+                    <span id="today-kwh">--</span>
+                    <span class="card-unit">kWh</span>
+                </div>
+                <div class="card-subtitle" id="today-cost">Estimasi: --</div>
+            </div>
+        </div>
+        
+        <div class="chart-container">
+            <div class="chart-title">📊 Grafik Konsumsi Daya (24 Jam Terakhir)</div>
+            <div class="chart-wrapper">
+                <canvas id="powerChart"></canvas>
+            </div>
+        </div>
+        
+        <div class="chart-container">
+            <div class="chart-title">📈 Konsumsi KWH Harian (30 Hari Terakhir)</div>
+            <div class="chart-wrapper">
+                <canvas id="dailyChart"></canvas>
+            </div>
+        </div>
+        
+        <div style="text-align: center; margin-top: 20px;">
+            <button class="refresh-btn" onclick="refreshData()">🔄 Refresh Data</button>
+        </div>
+        
+        <div class="last-update" id="last-update">
+            Terakhir diperbarui: --
+        </div>
+    </div>
+    
+    <script>
+        let powerChart = null;
+        let dailyChart = null;
+        
+        // Format angka
+        function formatNumber(num, decimals = 1) {
+            if (num === null || num === undefined) return '--';
+            return Number(num).toFixed(decimals);
+        }
+        
+        // Format rupiah
+        function formatRupiah(num) {
+            if (!num) return '--';
+            return 'Rp ' + num.toLocaleString('id-ID');
+        }
+        
+        // Update kartu data
+        function updateCards(data) {
+            document.getElementById('current-power').textContent = formatNumber(data.power_watt, 0);
+            document.getElementById('current-voltage').textContent = formatNumber(data.voltage, 1);
+            document.getElementById('current-ampere').textContent = formatNumber(data.current_ampere, 2);
+            
+            // Status daya
+            const power = data.power_watt || 0;
+            const statusEl = document.getElementById('power-status');
+            if (power > 3000) {
+                statusEl.innerHTML = '<span class="status-indicator status-offline"></span>Beban Tinggi';
+                statusEl.style.color = '#ff4444';
+            } else if (power > 1000) {
+                statusEl.innerHTML = '<span class="status-indicator status-online"></span>Beban Sedang';
+                statusEl.style.color = '#ffaa00';
+            } else {
+                statusEl.innerHTML = '<span class="status-indicator status-online"></span>Normal';
+                statusEl.style.color = '#00ff88';
+            }
+        }
+        
+        // Update grafik daya
+        function updatePowerChart(readings) {
+            const ctx = document.getElementById('powerChart').getContext('2d');
+            
+            const labels = readings.map(r => {
+                const d = new Date(r.timestamp);
+                return d.getHours().toString().padStart(2, '0') + ':' + d.getMinutes().toString().padStart(2, '0');
+            });
+            const data = readings.map(r => r.power_watt);
+            
+            if (powerChart) {
+                powerChart.destroy();
+            }
+            
+            powerChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Daya (Watt)',
+                        data: data,
+                        borderColor: '#00d4ff',
+                        backgroundColor: 'rgba(0, 212, 255, 0.1)',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            labels: { color: '#fff' }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            ticks: { color: '#888', maxTicksLimit: 12 },
+                            grid: { color: 'rgba(255,255,255,0.05)' }
+                        },
+                        y: {
+                            ticks: { color: '#888' },
+                            grid: { color: 'rgba(255,255,255,0.05)' },
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+        }
+        
+        // Update grafik harian
+        function updateDailyChart(summary) {
+            const ctx = document.getElementById('dailyChart').getContext('2d');
+            
+            // Urutkan dari terlama ke terbaru
+            const sorted = [...summary].reverse();
+            const labels = sorted.map(s => s.date);
+            const data = sorted.map(s => s.daily_kwh);
+            
+            if (dailyChart) {
+                dailyChart.destroy();
+            }
+            
+            dailyChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Konsumsi (kWh)',
+                        data: data,
+                        backgroundColor: 'rgba(0, 255, 136, 0.6)',
+                        borderColor: '#00ff88',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            labels: { color: '#fff' }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            ticks: { color: '#888', maxTicksLimit: 15 },
+                            grid: { color: 'rgba(255,255,255,0.05)' }
+                        },
+                        y: {
+                            ticks: { color: '#888' },
+                            grid: { color: 'rgba(255,255,255,0.05)' },
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+        }
+        
+        // Fetch dan update semua data
+        async function refreshData() {
+            try {
+                // Data current
+                const currentRes = await fetch('/api/current');
+                const currentData = await currentRes.json();
+                
+                if (currentData.success) {
+                    updateCards(currentData.data);
+                }
+                
+                // Data historis 24 jam
+                const historyRes = await fetch('/api/history?hours=24');
+                const historyData = await historyRes.json();
+                
+                if (historyData.success) {
+                    updatePowerChart(historyData.data);
+                }
+                
+                // Ringkasan harian
+                const dailyRes = await fetch('/api/daily?days=30');
+                const dailyData = await dailyRes.json();
+                
+                if (dailyData.success) {
+                    updateDailyChart(dailyData.data);
+                }
+                
+                // Update KWH hari ini dan estimasi biaya
+                const statsRes = await fetch('/api/stats');
+                const statsData = await statsRes.json();
+                
+                if (statsData.success) {
+                    const todayKwh = statsData.data.today_kwh || 0;
+                    document.getElementById('today-kwh').textContent = formatNumber(todayKwh, 2);
+                    
+                    // Estimasi tarif Rp 1.444,70/kWh (tarif rumah tangga 3500W)
+                    const cost = todayKwh * 1444.70;
+                    document.getElementById('today-cost').textContent = 'Estimasi: ' + formatRupiah(cost);
+                }
+                
+                // Update timestamp
+                document.getElementById('last-update').textContent = 
+                    'Terakhir diperbarui: ' + new Date().toLocaleString('id-ID');
+                
+            } catch (error) {
+                console.error('Error fetching data:', error);
+            }
+        }
+        
+        // Auto refresh tiap 30 detik
+        setInterval(refreshData, 30000);
+        
+        // Initial load
+        refreshData();
+    </script>
+</body>
+</html>
